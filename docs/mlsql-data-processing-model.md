@@ -4,6 +4,7 @@
   - [Word2VecInPlace](#word2vecinplace)
   - [ScalerInPlace](#scalerinplace)
   - [ConfusionMatrix](#confusionMatrix)
+  - [ModelExplainInPlace](#modelExplainInPlace)
   - [NormalizeInPlace](#normalizeinplace)
   - [Discretizer](#discretizer)
     - [bucketizer](#bucketizer方式)
@@ -172,6 +173,30 @@ register ScalerInPlace.`/tmp/scaler` as jack;
 ```sql
 select jack(array(a,b))[0] a,jack(array(a,b))[1] b, c from orginal_text_corpus
 ```
+
+
+## ModelExplainInPlace
+加载sklearn模型，显示训练后的模型参数
+
+train traindataframe as ConfusionMatrix.`/Users/dxy_why/tmp/modelExplainInPlace/` 
+where `systemParam.pythonPath`="python"
+and `systemParam.pythonVer`="2.7"
+// 模型路径
+and `modelPath`="/tmp/svm.pickle"
+```
+模型参数保存在/Users/dxy_why/tmp/modelExplainInPlace/data
+```
+select  * from parquet.`/Users/dxy_why/tmp/modelExplainInPlace/data` 
+```
+
+
+参数使用说明：
+
+|参数|默认值|说明|
+|:----|:----|:----|
+|modelPath|""|模型路径|
+
+
 
 ## ConfusionMatrix
 根据真实标签列和预测列计算混淆矩阵
