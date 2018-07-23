@@ -126,6 +126,8 @@ class ScriptSQLExecListener(_sparkSession: SparkSession, _defaultPathPrefix: Str
         new TrainAdaptor(this).parse(ctx)
       case "register" =>
         new RegisterAdaptor(this).parse(ctx)
+      case "define" =>
+        new DefineAdaptor(this).parse(ctx)
     }
 
   }
@@ -219,4 +221,8 @@ class ScriptSQLExecListener(_sparkSession: SparkSession, _defaultPathPrefix: Str
   override def enterSetKey(ctx: SetKeyContext): Unit = {}
 
   override def exitSetKey(ctx: SetKeyContext): Unit = {}
+
+  override def enterMethodBody(ctx: MethodBodyContext): Unit = {}
+
+  override def exitMethodBody(ctx: MethodBodyContext): Unit = {}
 }

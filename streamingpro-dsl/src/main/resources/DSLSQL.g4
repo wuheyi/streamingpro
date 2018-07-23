@@ -25,6 +25,7 @@ sql
     | ('train'|'TRAIN') tableName 'as' format '.' path 'where'? expression? booleanExpression*
     | ('register'|'REGISTER') format '.' path 'as' functionName 'options'? expression? booleanExpression*
     | ('unRegister'|'UNREGISTER') format '.' path 'options'? expression? booleanExpression*
+    | ('define'|'DEFINE') functionName '=' methodBody 'where' expression booleanExpression*
     |  SIMPLE_COMMENT
     ;
 
@@ -82,6 +83,10 @@ tableName
 
 functionName
     : identifier
+    ;
+
+methodBody
+    : quotedIdentifier
     ;
 
 col

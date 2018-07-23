@@ -1,4 +1,4 @@
-// Generated from DSLSQL.g4 by ANTLR 4.5.3
+// Generated from /Users/dxy_why/Documents/workspace/streamingpro/streamingpro-dsl/src/main/resources/DSLSQL.g4 by ANTLR 4.7
 
 package streaming.dsl.parser;
 
@@ -169,6 +169,16 @@ public interface DSLSQLListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitFunctionName(DSLSQLParser.FunctionNameContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DSLSQLParser#methodBody}.
+	 * @param ctx the parse tree
+	 */
+	void enterMethodBody(DSLSQLParser.MethodBodyContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DSLSQLParser#methodBody}.
+	 * @param ctx the parse tree
+	 */
+	void exitMethodBody(DSLSQLParser.MethodBodyContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DSLSQLParser#col}.
 	 * @param ctx the parse tree

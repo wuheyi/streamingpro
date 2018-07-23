@@ -1,4 +1,4 @@
-// Generated from DSLSQL.g4 by ANTLR 4.5.3
+// Generated from /Users/dxy_why/Documents/workspace/streamingpro/streamingpro-dsl/src/main/resources/DSLSQL.g4 by ANTLR 4.7
 
 package streaming.dsl.parser;
 
@@ -205,6 +205,18 @@ public class DSLSQLBaseListener implements DSLSQLListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitFunctionName(DSLSQLParser.FunctionNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterMethodBody(DSLSQLParser.MethodBodyContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitMethodBody(DSLSQLParser.MethodBodyContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
