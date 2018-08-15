@@ -1,112 +1,172 @@
 ## MLSQL
 
-MLSQL通过添加了两个特殊语法，使得SQL也能够支持机器学习。
+- Feature engineer modules
+    - Text
+        - [TfIdfInPlace](#tfidfinplace)
+        - [Word2VecInPlace](#word2vecinplace)
+        - [ScalerInPlace](#scalerinplace)
+        - [ConfusionMatrix](#confusionmatrix)
+        - [NormalizeInPlace](#normalizeinplace)
+        - [ModelExplainInPlace](#modelexplaininplace)
+        - [Discretizer](#discretizer)
+        - [bucketizer](#bucketizer方式)
+        - [quantile](#quantile方式)        
+        - [VecMapInPlace](#vecmapinplace)        
+        - [TokenExtract / TokenAnalysis](#tokenextract--tokenanalysis)
+        - [RateSampler](#ratesampler)
+        - [RowMatrix](#rowmatrix)
+        - [CommunityBasedSimilarityInPlace](#communitybasedsimilarityonplace)
+        - [Word2ArrayInPlace](#word2arrayinplace)
+    - Image
+        - [OpenCVImage](#opencvimage)
+        - [JavaImage](#javaimage)
+- Collaborative filtering
+    - [ALS](#als)
+- Classification    
+    - [NaiveBayes](#naivebayes)
+    - [RandomForest](#randomforest)
+    - [GBTRegressor](#gbtregressor)
+- Clustering
+    - [LDA](#lda)
+    - [KMeans](#kmeans)
+- [FPGrowth](#fpgrowth)
+- [GBTs](#gbts)
+- [PageRank](#pagerank)
+- [LogisticRegressor](#logisticregressor)
 
 
-### 模型训练
+### TfIdfInPlace
 
-语法：
+TfIdfInPlace is used to convert raw text to vector.
+
+The processing steps include:
+
+1. word analysis
+2. filter with stopwords 
+3. ngram
+4. word indexed with integer
+5. compute idf/tf
+6. weighted specified words
+
+
+Example:
 
 ```sql
--- 从tableName获取数据，通过where条件对Algorithm算法进行参数配置并且进行模型训练，最后
--- 训练得到的模型会保存在path路径。
-train [tableName] as [Algorithm].[path] where [booleanExpression]
+train orginal_text_corpus as TfIdfInPlace.`/tmp/tfidfinplace`
+where inputCol="content"
+
+-- analysis options 
+and ignoreNature="true"
+and dicPaths="...."
+and stopWordPath="/tmp/tfidf/stopwords"
+
+-- words should be weighted
+and priorityDicPath="/tmp/tfidf/prioritywords"
+and priority="5.0"
+
+-- ngram 
+and nGram="2,3"
+;
+
+load parquet.`/tmp/tfidf/data` as lwys_corpus_with_featurize; 
+
+register TfIdfInPlace.`/tmp/tfidfinplace` as predict;
 ```
 
-比如：
+
+### Word2VecInPlace
+
+Word2VecInPlace is used to convert raw text to vector/sequence.
+
+The processing steps include:
+
+1. word analysis
+2. filter with stopwords 
+3. ngram
+4. word indexed with integer
+5. convert integer to vector
+6. returns 1/2d array according to the requirements 
+
+If you declare word embedding directory  explicitly, Word2VecInPlace will skip the step training with word2vec algorithm.
+
+Example：
 
 ```sql
-train data as RandomForest.`/tmp/model` where inputCol="featrues" and maxDepth="3"
+load parquet.`/tmp/tfidf/df`
+as orginal_text_corpus;
+
+train orginal_text_corpus as Word2VecInPlace.`/tmp/word2vecinplace`
+where inputCol="content"
+and ignoreNature="true"
+and stopWordPath="/tmp/tfidf/stopwords"
+and resultFeature="flat";
+
+load parquet.`/tmp/word2vecinplace/data` 
+as lwys_corpus_with_featurize;
+
+register Word2VecInPlace.`/tmp/tfidfinplace` as predict;
 ```
 
-这句话表示使用对表data中的featrues列使用RandomForest进行训练，树的深度为3。训练完成后的模型会保存在`tmp/model`。
+Parameters:
 
-很简单对么？
-
-如果需要知道算法的输入格式以及算法的参数,可以参看[Spark MLlib](https://spark.apache.org/docs/latest/ml-guide.html)。
-在MLSQL中，输入格式和算法的参数和Spark MLLib保持一致。
-
-### 样本不均衡问题
-
-为了解决样本数据不平衡问题，所有模型（目前只支持贝叶斯）都支持一种特殊的训练方式。假设我们是一个二分类，A,B。 A 分类有100个样本，B分类有1000个。
-差距有十倍。为了得到一个更好的训练效果，我们会训练十个（最大样本数/最小样本数）模型。
-
-第一个模型：
-
-A拿到100,从B随机抽样10%(100/1000),训练。
-
-重复第一个模型十次。
-
-这个可以通过在where条件里把multiModels="true" 即可开启。
-
-在预测函数中，会自动拿到置信度最高模型作为预测结果。
-
-
-### 预测
-
-语法：
-
-```sql
--- 从Path中加载Algorithm算法对应的模型，并且将该模型注册为一个叫做functionName的函数。
-register [Algorithm].[Path] as functionName;
-```
-
-比如：
-
-```
-register RandomForest.`/tmp/zhuwl_rf_model` as zhuwl_rf_predict;
-```
-
-接着我就可以在SQL中使用该函数了：
-
-```
-select zhuwl_rf_predict(features) as predict_label, label as original_label from sample_table;
-```
-
-很多模型会有多个预测函数。假设我们名字都叫predict
-
-LDA 有如下函数：
-
-* predict  参数为一次int类型，返回一个主题分布。
-* predict_doc 参数为一个int数组，返回一个主题分布
-
-
+|Parameter|Default|Comments|
+|:----|:----|:----|
+|inputCol|None||
+|resultFeature|None|flag:flat n-dim array to 1-dim array;merge: merge n-dim array；index: output word sequence|
+|dicPaths|None||
+|wordvecPaths|None||
+|vectorSize|None||
+|length|None|input sentence length|
+|stopWordPath|None||
+|split|None||
+|minCount|None||
 
 
 ### ALS
 
+ALS is the abbreviation of "alternating least squares", and it is a implementation of Collaborative filtering which aims 
+to fill in the missing entries of a user-item association matrix.
+
+Example:
+
 ```sql
 train data as ALSInPlace.`/tmp/als` where
--- 第一组参数
+
+-- the first group of parameters
 `fitParam.0.maxIter`="5"
 and `fitParam.0.regParam` = "0.01"
 and `fitParam.0.userCol` = "userId"
 and `fitParam.0.itemCol` = "movieId"
 and `fitParam.0.ratingCol` = "rating"
--- 第二组参数    
+
+-- the sencond group of parameters    
 and `fitParam.1.maxIter`="1"
 and `fitParam.1.regParam` = "0.1"
 and `fitParam.1.userCol` = "userId"
 and `fitParam.1.itemCol` = "movieId"
 and `fitParam.1.ratingCol` = "rating"
--- 计算rmse     
+
+-- compute rmse     
 and evaluateTable="test"
 and ratingCol="rating"
--- 针对用户做推荐，推荐数量为10  
+
+-- size of recommending items for user  
 and `userRec` = "10"
--- 针对内容推荐用户，推荐数量为10
+
+-- size of recommending users for item
 -- and `itemRec` = "10"
 and coldStartStrategy="drop"
 ```
 
-你可以查看模型最后的详情：
+
+Load model-meta-path:
 
 ```sql
 load parquet.`/tmp/als/_model_0/meta/0` as models;
-select * from models as result;
+select * from models as output;
 ```
 
-效果如下：
+Here the metas: 
 
 ```
 +--------------------+--------+--------------------+------------------+-------+-------------+-------------+--------------------+
@@ -117,17 +177,14 @@ select * from models as result;
 +--------------------+--------+--------------------+------------------+-------+-------------+-------------+--------------------+
 ```
 
-你可以获取预测结果
+Load  model-data-path:
 
 ```sql
 load parquet.`/tmp/a/data/userRec` as userRec;
 select * from userRec as result;
 ```
 
-算法会自动根据evaluateTable 计算rmse,取rmse最小的作为最好的模型。
-
-
-
+Note: the algorithm find the best model with the smallest value of RMSE. 
 
 
 
@@ -197,7 +254,7 @@ body
 1 2
 ```
 
-示例:
+Example:
 
 ```sql
 load csv.`/tmp/abc.csv` options header="True" as data;
@@ -235,7 +292,7 @@ save overwrite result as json.`/tmp/result`;
 
 ### PageRank
 
-PageRank 可以对有关系对的东西进行建模，输入也很简答，只要item-item pair 就行。
+PageRank take item-item pair as input, and calculate the weight of edge.
 
 ```
 load csv.`/spark-2.2.0-bin-hadoop2.7/data/mllib/pagerank_data.txt` as data;

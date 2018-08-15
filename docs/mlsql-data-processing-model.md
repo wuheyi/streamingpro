@@ -14,6 +14,9 @@
   - [JavaImage](#javaimage)
   - [TokenExtract / TokenAnalysis](#tokenextract--tokenanalysis)
   - [RateSampler](#ratesampler)
+  - [RowMatrix](#RowMatrix)
+  - [CommunityBasedSimilarityInPlace](#CommunityBasedSimilarityInPlace)
+  - [Word2ArrayInPlace](#Word2ArrayInPlace)
 - [**低阶数据预处理模型**](#低阶特定小功能点数据预处理模型)
   - [Word2vec](#word2vec)
   - [StringIndex](#stringindex)
@@ -21,7 +24,7 @@
   - [StandardScaler](#standardscaler)
   - [DicOrTableToArray](#dicortabletoarray)
 
----
+
 
 ### 高阶（开箱即用）数据预处理模型
 
@@ -665,8 +668,9 @@ and isSplitWithSubLabel="true"
 
 ## ModelExplainInPlace
 
-加载sklearn模型，显示训练后的模型参数
+加载sklearn或者sparkmllib模型，显示训练后的模型参数
 
+加载sklearn模型
 ```
 train traindataframe as ModelExplainInPlace.`tmp/modelExplainInPlace/` 
 where `systemParam.pythonPath`="python"
@@ -674,6 +678,14 @@ and `systemParam.pythonVer`="2.7"
 // 模型路径
 and `modelPath`="/tmp/svm.pickle"
 ```
+
+加载sparkmllib模型
+```
+train traindataframe as ModelExplainInPlace.`tmp/modelExplainInPlace/` 
+where `modelPath`="/tmp/model"
+and `modelType`="sparkmllib"
+```
+
 模型参数保存在/tmp/modelExplainInPlace/data，
 该参数在ModelExplainInPlace.`tmp/modelExplainInPlace/` 处设置
 ```
@@ -876,4 +888,126 @@ select p2("dic2")  as k
 ```
 
 
+### Word2ArrayInPlace
 
+
+Word2ArrayInPlace是一个根据词向量字典或者模型（Word2VecInPlace,TfIdfInPlace）将文本转化成词数组。
+
+
+具体用法：
+
+```sql
+load parquet.`/tmp/tfidf/df`
+as orginal_text_corpus;
+
+-- Word2VecInPlace训练得到Word2VecInPlace模型
+train orginal_text_corpus as Word2VecInPlace.`/tmp/word2vecinplace`
+where inputCol="content"
+and split=""
+;
+
+-- 训练得到Word2ArrayInPlace模型，train任意表，空表也可以
+train orginal_text_corpus as Word2ArrayInPlace.`/tmp/word2arrayinplace`
+-- modelPath为模型绝对路径
+where modelPath="/tmp/word2vecinplace"
+-- 词向量字典
+-- and wordvecPaths=""
+;
+-- 注册Word2ArrayInPlace模型
+register Word2ArrayInPlace.`/tmp/word2arrayinplace`
+as word2array_predict;
+```
+
+
+### RowMatrix
+
+当你想计算向量两两相似的时候，RowMatrix提供了一个快速高效的方式。比如LDA计算出了每个文档的向量分布，接着我们需要任意给定一个文章，然后找到
+相似的文章， 则可以使用RowMatrix进行计算。无论如何，当文档到百万，计算量始终都是很大的（没有优化前会有万亿次计算），所以实际使用可以将数据
+先简单分类。之后在类里面再做相似度计算。
+
+另外RowMatrix需要两个字段，一个是向量，一个是数字，数字必须是从0开始递增，用来和矩阵行做对应，方便唯一标记一篇内容。
+如果你的数据不是这样的，比如你的文档的唯一编号是断开的或者是一个字符串，那么你可以使用StringIndex 去生成一个字段作为唯一标记。
+
+```sql
+load libsvm.`/spark-2.2.0-bin-hadoop2.7/data/mllib/sample_lda_libsvm_data.txt` as data;
+train data as LDA.`/tmp/model` where k="10" and maxIter="10";
+
+register LDA.`/tmp/model` as predict;
+
+select *,zhuhl_lda_predict_doc(features) as features from data
+as zhuhl_doclist;
+
+train zhuhl_doclist as RowMatrix.`/tmp/zhuhl_rm_model` where inputCol="features" and labelCol="label";
+register RowMatrix.`/tmp/zhuhl_rm_model` as zhuhl_rm_predict;
+
+select zhuhl_rm_predict(label) from data
+```
+
+### CommunityBasedSimilarityInPlace
+
+该模块可以根据graphx计算所有边大于一定值，并且是联通的的子图。
+
+```sql
+train tab;e as CommunityBasedSimilarityInPlace.`/tmp/zhuhl_rm_model`
+-- 设置需要过滤的边的阈值以及联通子图的大小 
+where minSimilarity="0.7"
+and minCommunitySize="2"
+and minCommunityPercent="0.2"
+
+-- 接受的数据rowNum和columnNum是两个节点的id,edgeValue是节点的边的值
+and "rowNum"="i"
+and "columnNum"="j"
+and "edgeValue"="v"
+;
+
+load parquet.`/tmp/zhuhl_rm_model/data` as result;
+select * from result as output;
+
+-- 结果如下：
+ +-----+---------+
+ |group|vertexIds|
+ +-----+---------+
+ |3    |[3, 7, 5]|
+ +-----+---------+
+```
+
+### RawSimilarInPlace
+
+RawSimilarInPlace用来计算n篇文章的相似度。训练逻辑如下：
+
+1.准备已经训练好的word2vec模型
+
+2.对文章按分隔符分割，得到多个句子
+
+3.对文章的每个句子进行word2vec，每个句子变成了多个向量，然后多个向量进行merge,最后每个句子都是一个向量，一篇文章由多个向量组成
+
+4.对两篇文章的向量两两相似度进行计算，得到n(n-1)/2个相似度
+
+具体用法：
+
+```sql
+load parquet.`/tmp/tfidf/df`
+as word2vec_corpus;
+
+-- Word2VecInPlace训练得到Word2VecInPlace模型
+train word2vec_corpus as Word2VecInPlace.`/tmp/word2vecinplace`
+where inputCol="content"
+;
+
+-- RawSimilarInPlace训练
+load parquet.`/tmp/raw` as data；
+
+-- modelPath为绝对路径
+train data as RawSimilarInPlace.`/tmp/rawsimilar` where
+modelPath="/tmp/william/tmp/word2vecinplace"
+-- sentenceSplit 句子分割符，默认以"。"分割，可以填多个，比如",。；"
+and sentenceSplit=",。"
+-- modelType默认Word2VecInplace，目前只支持Word2VecInplace模型
+and modelType="Word2VecInplace"
+and inputCol="features"
+and labelCol="label";
+register RawSimilarInPlace.`/tmp/rawsimilar` as rs_predict;
+
+-- 0.8为相似度比例阀值,得到与文章相似度高于阀值的文章label,结果类型为Map[Long,Double]
+select rs_predict(label,0.8) from data;
+```
