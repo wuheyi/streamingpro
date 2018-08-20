@@ -16,8 +16,8 @@ import streaming.dsl.template.TemplateMerge
 
 
 /**
- * Created by allwefantasy on 6/5/2018.
- */
+  * Created by allwefantasy on 6/5/2018.
+  */
 class AutoMLSpec extends BasicSparkOperation with SpecFunctions with BasicMLSQLConfig {
 
 
@@ -426,6 +426,30 @@ class AutoMLSpec extends BasicSparkOperation with SpecFunctions with BasicMLSQLC
           }
         }
       }
+    }
+  }
+
+  "SQLFeatureExtractInPlace" should "work fine" taggedAs (NotToRunTag) in {
+    withBatchContext(setupBatchContext(batchParams, "classpath:///test/empty.json")) { runtime: SparkRuntime =>
+      //执行sql
+      implicit val spark = runtime.sparkSession
+      val dataRDD = spark.sparkContext.parallelize(Seq(
+        "请联系 13634282910",
+        "扣扣 527153688@qq.com",
+        "www.baidu.com")).map { f =>
+        Row.fromSeq(f)
+      }
+
+      val df = spark.createDataFrame(dataRDD,
+        StructType(Seq(
+          StructField("doc", StringType)
+        )))
+      df.createOrReplaceTempView("FeatureExtractInPlaceData")
+
+      val sq = createSSEL
+      ScriptSQLExec.parse(loadSQLScriptStr("feature-extract"), sq)
+
+      spark.sql("select * from parquet.`/tmp/william/tmp/featureExtractInPlace/data`").show(10, false)
     }
   }
 
